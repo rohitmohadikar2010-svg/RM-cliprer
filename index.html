@@ -16,11 +16,12 @@ main{max-width:1120px;margin:54px auto;padding:0 22px}.hero{text-align:center;ma
 <body>
 <header><div class="brand">RM <span>CLIPER</span></div><div class="tag">NO ADS • FREE TO START</div></header>
 <main>
-<section class="hero"><div class="eyebrow">MAKE EVERY SECOND COUNT</div><h1>Long video in.<br><em>Great clips out.</em></h1><p>Choose a video, select the moment you want, and export a short clip for Shorts, Reels or TikTok. Your video stays in your browser.</p></section>
+<section class="hero"><div class="eyebrow">MAKE EVERY SECOND COUNT</div><h1>Long video in.<br><em>Great clips out.</em></h1><p>Paste a direct video link, select the moment you want, and export a short clip. Your video stays in your browser.</p></section>
 <div class="layout">
-<section class="panel"><h2>① Upload your video</h2>
-<label class="drop" for="file"><div style="font-size:32px">⬆</div><strong>Choose a video from your device</strong><span class="muted">MP4, WebM and other browser-supported formats</span><div class="row" style="justify-content:center"><span class="btn">Select video</span></div></label>
-<input id="file" type="file" accept="video/*">
+<section class="panel"><h2>① Paste your video link</h2>
+<div class="field"><label for="videoUrl">Direct video URL</label><input id="videoUrl" type="url" placeholder="https://example.com/video.mp4" style="display:block;width:100%;padding:14px;border-radius:10px;border:1px solid var(--line);background:#080d0b;color:#f4fff6" autocomplete="url"></div>
+<div class="row"><button class="btn" id="loadUrl">Load video</button></div>
+<p class="muted">Use a direct MP4 or WebM file link. YouTube, Instagram and TikTok page links are not direct video files.</p>
 <video id="video" controls playsinline hidden></video>
 <div id="controls" hidden>
 <div class="field"><label>Clip start <span id="startVal">0.0s</span></label><input id="start" type="range" min="0" max="100" value="0" step=".1"></div>
@@ -36,14 +37,14 @@ main{max-width:1120px;margin:54px auto;padding:0 22px}.hero{text-align:center;ma
 <div class="foot">© 2026 RM CLIPER • Built for creators • No advertisements</div>
 </main>
 <script>
-const file=document.getElementById('file'), video=document.getElementById('video'), controls=document.getElementById('controls'), start=document.getElementById('start'), end=document.getElementById('end'), status=document.getElementById('status');
+const videoUrl=document.getElementById('videoUrl'), loadUrl=document.getElementById('loadUrl'), video=document.getElementById('video'), controls=document.getElementById('controls'), start=document.getElementById('start'), end=document.getElementById('end'), status=document.getElementById('status');
 let objectUrl=null;
 function fmt(n){return Number(n).toFixed(1)+'s'}
 function sync(){document.getElementById('startVal').textContent=fmt(start.value);document.getElementById('endVal').textContent=fmt(end.value)}
-file.addEventListener('change',()=>{const f=file.files[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);video.src=objectUrl;video.hidden=false;controls.hidden=false;video.onloadedmetadata=()=>{start.max=video.duration;end.max=video.duration;start.value=0;end.value=video.duration;sync();status.textContent='Video ready: '+f.name};});
+loadUrl.addEventListener('click',()=>{const url=videoUrl.value.trim();if(!url){status.textContent='Paste a direct MP4 or WebM video link first.';return}try{const parsed=new URL(url);if(!['http:','https:'].includes(parsed.protocol))throw new Error('bad url');}catch(e){status.textContent='Please enter a valid http or https video link.';return}if(objectUrl){URL.revokeObjectURL(objectUrl);objectUrl=null}video.pause();video.src=url;video.hidden=false;controls.hidden=true;status.textContent='Loading video…';video.onerror=()=>{status.textContent='Could not load this link. Use a direct MP4/WebM URL that allows browser playback.'};video.onloadedmetadata=()=>{start.max=video.duration;end.max=video.duration;start.value=0;end.value=video.duration;sync();controls.hidden=false;status.textContent='Video link loaded. Choose your clip.'};});
 start.addEventListener('input',()=>{if(+start.value>=+end.value)start.value=Math.max(0,+end.value-.1);sync()});
 end.addEventListener('input',()=>{if(+end.value<=+start.value)end.value=Math.min(video.duration,+start.value+.1);sync()});
-document.getElementById('reset').onclick=()=>{file.value='';video.pause();video.removeAttribute('src');video.load();video.hidden=true;controls.hidden=true;status.textContent='Choose a video to start.'};
+document.getElementById('reset').onclick=()=>{videoUrl.value='';video.pause();video.removeAttribute('src');video.load();video.hidden=true;controls.hidden=true;status.textContent='Paste a video link to start.'};
 document.getElementById('export').onclick=async()=>{if(!video.duration)return;const a=+start.value,b=+end.value;if(b<=a){status.textContent='Choose a valid start and end.';return}if(!window.MediaRecorder){status.textContent='Your browser does not support clip export.';return}
 const stream=video.captureStream?video.captureStream():video.mozCaptureStream?.();if(!stream){status.textContent='Video export is not supported for this format in this browser.';return}
 let mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));if(!mime){status.textContent='This browser cannot export WebM video.';return}
