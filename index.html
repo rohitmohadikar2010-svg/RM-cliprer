@@ -38,7 +38,7 @@ main{max-width:1120px;margin:54px auto;padding:0 22px}.hero{text-align:center;ma
 <div id="controls" hidden>
 <div class="field"><label>Clip start <span id="startVal">0.0s</span></label><input id="start" type="range" min="0" max="100" value="0" step=".1"></div>
 <div class="field"><label>Clip end <span id="endVal">0.0s</span></label><input id="end" type="range" min="0" max="100" value="10" step=".1"></div>
-<div class="row"><button class="btn" id="export">Export clip</button><button class="btn secondary" id="reset">Choose another</button></div>
+<div class="row"><button class="btn" id="export">Export clip</button><button class="btn secondary" id="findMoments">Find best moments</button><button class="btn secondary" id="reset">Choose another</button></div><p class="muted">Smart beta scans audio peaks in an uploaded video and suggests moments. This is not full AI semantic analysis yet.</p>
 <div class="status" id="status" aria-live="polite"></div>
 </div>
 </section>
@@ -51,7 +51,7 @@ main{max-width:1120px;margin:54px auto;padding:0 22px}.hero{text-align:center;ma
 <script>
 const youtubeUrl=document.getElementById('youtubeUrl'), loadYoutube=document.getElementById('loadYoutube'), youtubePreview=document.getElementById('youtubePreview'), youtubeFrame=document.getElementById('youtubeFrame'), videoFile=document.getElementById('videoFile');
 const videoUrl=document.getElementById('videoUrl'), loadUrl=document.getElementById('loadUrl'), video=document.getElementById('video'), controls=document.getElementById('controls'), start=document.getElementById('start'), end=document.getElementById('end'), status=document.getElementById('status');
-let objectUrl=null, liveObjectUrl=null, liveRecorder=null, liveParts=[], liveCapture=null;
+let objectUrl=null, liveObjectUrl=null, liveRecorder=null, liveParts=[], liveCapture=null, selectedFile=null;
 const startLive=document.getElementById('startLive'), stopLive=document.getElementById('stopLive');
 startLive.addEventListener('click',async()=>{
  if(!navigator.mediaDevices?.getDisplayMedia||!window.MediaRecorder){status.textContent='Live capture needs an up-to-date Chrome browser on the website (HTTPS).';return}
@@ -80,13 +80,46 @@ stopLive.addEventListener('click',()=>{if(liveRecorder?.state==='recording'){liv
 
 function youtubeId(value){try{const u=new URL(value);if(u.hostname==='youtu.be')return u.pathname.slice(1).split('/')[0];if(u.hostname.endsWith('youtube.com')){if(u.pathname==='/watch')return u.searchParams.get('v');if(u.pathname.startsWith('/shorts/')||u.pathname.startsWith('/embed/'))return u.pathname.split('/')[2]} }catch(e){}return null}
 loadYoutube.addEventListener('click',()=>{const id=youtubeId(youtubeUrl.value.trim());if(!id||!/^[A-Za-z0-9_-]{11}$/.test(id)){status.textContent='Enter a valid YouTube video link.';return}youtubeFrame.src='https://www.youtube-nocookie.com/embed/'+id;youtubePreview.hidden=false;status.textContent='YouTube preview loaded. Upload an authorized video file below to trim and export.'});
-videoFile.addEventListener('change',()=>{const file=videoFile.files&&videoFile.files[0];if(!file)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(file);video.pause();video.src=objectUrl;video.hidden=false;controls.hidden=true;status.textContent='Loading uploaded video…';video.onerror=()=>{status.textContent='Could not open this video file.'};video.onloadedmetadata=()=>{start.max=video.duration;end.max=video.duration;start.value=0;end.value=video.duration;sync();controls.hidden=false;status.textContent='Video ready. Choose your clip.'};});
+videoFile.addEventListener('change',()=>{const file=videoFile.files&&videoFile.files[0];if(!file)return;selectedFile=file;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(file);video.pause();video.src=objectUrl;video.hidden=false;controls.hidden=true;status.textContent='Loading uploaded video…';video.onerror=()=>{status.textContent='Could not open this video file.'};video.onloadedmetadata=()=>{start.max=video.duration;end.max=video.duration;start.value=0;end.value=video.duration;sync();controls.hidden=false;status.textContent='Video ready. Choose your clip.'};});
+document.getElementById('findMoments').addEventListener('click',async()=>{
+ const btn=document.getElementById('findMoments');
+ if(!selectedFile){status.textContent='Smart scan abhi uploaded video file par kaam karta hai. Pehle video upload karo.';return}
+ if(!window.AudioContext&&!window.webkitAudioContext){status.textContent='Audio scan is not supported in this browser.';return}
+ btn.disabled=true;status.textContent='Scanning audio for energetic moments…';
+ try{
+  const Ctx=window.AudioContext||window.webkitAudioContext,ctx=new Ctx();
+  const buffer=await ctx.decodeAudioData(await selectedFile.arrayBuffer());
+  const data=buffer.getChannelData(0),rate=buffer.sampleRate,step= Math.max(1,Math.floor(rate*1.5));
+  const windows=[];
+  for(let p=0;p<data.length;p+=step){
+   let sum=0,n=Math.min(step,data.length-p);
+   for(let j=0;j<n;j+=8)sum+=data[p+j]*data[p+j];
+   windows.push({t:p/rate,score:Math.sqrt(sum/Math.max(1,Math.ceil(n/8)))});
+  }
+  const clipLen=Math.min(30,Math.max(10,buffer.duration/5));
+  const candidates=[];
+  for(let i=0;i<windows.length;i++){
+   const t=windows[i].t;if(t+clipLen>buffer.duration)continue;
+   const subset=windows.filter(w=>w.t>=t&&w.t<t+clipLen);
+   const score=subset.reduce((a,w)=>a+w.score,0)/Math.max(1,subset.length);
+   if(!candidates.some(c=>Math.abs(c.start-t)<clipLen*.7))candidates.push({start:t,end:t+clipLen,score});
+  }
+  candidates.sort((a,b)=>b.score-a.score);
+  const best=candidates[0];
+  if(!best)throw new Error('Could not find a suitable section in this video.');
+  start.value=Math.max(0,best.start);end.value=Math.min(video.duration,best.end);sync();
+  video.currentTime=Number(start.value);
+  status.textContent='Suggested moment: '+fmt(start.value)+' to '+fmt(end.value)+'. Preview it, adjust if needed, then Export clip.';
+  await ctx.close();
+ }catch(e){status.textContent=e.message||'Audio scan failed. Try another uploaded video.'}
+ finally{btn.disabled=false}
+});
 function fmt(n){return Number(n).toFixed(1)+'s'}
 function sync(){document.getElementById('startVal').textContent=fmt(start.value);document.getElementById('endVal').textContent=fmt(end.value)}
 loadUrl.addEventListener('click',()=>{const url=videoUrl.value.trim();if(!url){status.textContent='Paste a direct MP4 or WebM video link first.';return}try{const parsed=new URL(url);if(!['http:','https:'].includes(parsed.protocol))throw new Error('bad url');}catch(e){status.textContent='Please enter a valid http or https video link.';return}if(objectUrl){URL.revokeObjectURL(objectUrl);objectUrl=null}video.pause();video.src=url;video.hidden=false;controls.hidden=true;status.textContent='Loading video…';video.onerror=()=>{status.textContent='Could not load this link. Use a direct MP4/WebM URL that allows browser playback.'};video.onloadedmetadata=()=>{start.max=video.duration;end.max=video.duration;start.value=0;end.value=video.duration;sync();controls.hidden=false;status.textContent='Video link loaded. Choose your clip.'};});
 start.addEventListener('input',()=>{if(+start.value>=+end.value)start.value=Math.max(0,+end.value-.1);sync()});
 end.addEventListener('input',()=>{if(+end.value<=+start.value)end.value=Math.min(video.duration,+start.value+.1);sync()});
-document.getElementById('reset').onclick=()=>{if(liveRecorder?.state==='recording')liveRecorder.stop();videoUrl.value='';videoFile.value='';video.pause();video.removeAttribute('src');video.load();video.hidden=true;controls.hidden=true;status.textContent='Paste a video link to start.'};
+document.getElementById('reset').onclick=()=>{selectedFile=null;if(liveRecorder?.state==='recording')liveRecorder.stop();videoUrl.value='';videoFile.value='';video.pause();video.removeAttribute('src');video.load();video.hidden=true;controls.hidden=true;status.textContent='Paste a video link to start.'};
 document.getElementById('export').onclick=async()=>{if(!video.duration)return;const a=+start.value,b=+end.value;if(b<=a){status.textContent='Choose a valid start and end.';return}if(!window.MediaRecorder){status.textContent='Your browser does not support clip export.';return}
 const stream=video.captureStream?video.captureStream():video.mozCaptureStream?.();if(!stream){status.textContent='Video export is not supported for this format in this browser.';return}
 let mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));if(!mime){status.textContent='This browser cannot export WebM video.';return}
