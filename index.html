@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RM CLIPER — AI Video Clipper</title>
+<style>
+:root{--bg:#080b0a;--panel:#111715;--line:#24312b;--green:#b6ff38;--muted:#9aaba1}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% 0,#18321d 0,transparent 34%),var(--bg);color:#f4fff6;font:16px Inter,system-ui,Arial,sans-serif}
+header{height:72px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(5%,calc((100% - 1120px)/2));position:sticky;top:0;background:#080d0bed;backdrop-filter:blur(12px);z-index:3}
+.brand{font-weight:900;letter-spacing:1px;font-size:21px}.brand span{color:var(--green)}.tag{font-size:12px;color:var(--green);border:1px solid #52712d;padding:7px 11px;border-radius:30px}
+main{max-width:1120px;margin:54px auto;padding:0 22px}.hero{text-align:center;margin-bottom:36px}.eyebrow{color:var(--green);font-weight:700;letter-spacing:2px;font-size:12px}.hero h1{font-size:clamp(38px,7vw,66px);line-height:1.02;margin:15px 0}.hero h1 em{font-style:normal;color:var(--green)}.hero p{color:var(--muted);max-width:600px;margin:auto;line-height:1.6}
+.layout{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}.panel{background:linear-gradient(145deg,#151e19,#0e1311);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 18px 60px #0005}.panel h2{font-size:18px;margin:0 0 18px}.drop{border:1px dashed #5a7943;border-radius:14px;padding:28px 16px;text-align:center;background:#111b13}.drop strong{display:block;margin:10px 0 5px}.muted{color:var(--muted);font-size:13px}.btn{border:0;border-radius:10px;padding:12px 17px;background:var(--green);color:#10170a;font-weight:800;cursor:pointer}.btn:disabled{opacity:.4;cursor:not-allowed}.btn.secondary{background:#202b25;color:#efffed;border:1px solid #35463b}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:15px}video{width:100%;max-height:340px;background:#050605;border-radius:12px;margin-top:16px}.field{margin:17px 0}.field label{display:flex;justify-content:space-between;color:#d9e8dc;font-size:13px;margin-bottom:8px}input[type=range]{width:100%;accent-color:var(--green)}input[type=file]{display:none}.status{color:var(--green);font-size:13px;min-height:20px;margin-top:12px}.feature{padding:12px 0;border-bottom:1px solid var(--line);color:#dce8df}.feature:last-child{border:0}.feature b{color:var(--green);margin-right:8px}.foot{text-align:center;color:#77877d;font-size:12px;margin:30px 0}
+@media(max-width:760px){main{margin:32px auto}.layout{grid-template-columns:1fr}header{padding:0 18px}}
+</style>
+</head>
+<body>
+<header><div class="brand">RM <span>CLIPER</span></div><div class="tag">NO ADS • FREE TO START</div></header>
+<main>
+<section class="hero"><div class="eyebrow">MAKE EVERY SECOND COUNT</div><h1>Long video in.<br><em>Great clips out.</em></h1><p>Choose a video, select the moment you want, and export a short clip for Shorts, Reels or TikTok. Your video stays in your browser.</p></section>
+<div class="layout">
+<section class="panel"><h2>① Upload your video</h2>
+<label class="drop" for="file"><div style="font-size:32px">⬆</div><strong>Choose a video from your device</strong><span class="muted">MP4, WebM and other browser-supported formats</span><div class="row" style="justify-content:center"><span class="btn">Select video</span></div></label>
+<input id="file" type="file" accept="video/*">
+<video id="video" controls playsinline hidden></video>
+<div id="controls" hidden>
+<div class="field"><label>Clip start <span id="startVal">0.0s</span></label><input id="start" type="range" min="0" max="100" value="0" step=".1"></div>
+<div class="field"><label>Clip end <span id="endVal">0.0s</span></label><input id="end" type="range" min="0" max="100" value="10" step=".1"></div>
+<div class="row"><button class="btn" id="export">Export clip</button><button class="btn secondary" id="reset">Choose another</button></div>
+<div class="status" id="status" aria-live="polite"></div>
+</div>
+</section>
+<aside class="panel"><h2>② Your creator toolkit</h2>
+<div class="feature"><b>✓</b> Select the exact clip moment</div><div class="feature"><b>✓</b> Preview before exporting</div><div class="feature"><b>✓</b> Download a video clip</div><div class="feature"><b>✓</b> No ads and no account needed</div>
+<p class="muted" style="line-height:1.6;margin-top:22px">This starter version trims a selected section in your browser. Automatic AI highlight detection, animated captions and cloud projects are not enabled yet.</p>
+</aside></div>
+<div class="foot">© 2026 RM CLIPER • Built for creators • No advertisements</div>
+</main>
+<script>
+const file=document.getElementById('file'), video=document.getElementById('video'), controls=document.getElementById('controls'), start=document.getElementById('start'), end=document.getElementById('end'), status=document.getElementById('status');
+let objectUrl=null;
+function fmt(n){return Number(n).toFixed(1)+'s'}
+function sync(){document.getElementById('startVal').textContent=fmt(start.value);document.getElementById('endVal').textContent=fmt(end.value)}
+file.addEventListener('change',()=>{const f=file.files[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);video.src=objectUrl;video.hidden=false;controls.hidden=false;video.onloadedmetadata=()=>{start.max=video.duration;end.max=video.duration;start.value=0;end.value=video.duration;sync();status.textContent='Video ready: '+f.name};});
+start.addEventListener('input',()=>{if(+start.value>=+end.value)start.value=Math.max(0,+end.value-.1);sync()});
+end.addEventListener('input',()=>{if(+end.value<=+start.value)end.value=Math.min(video.duration,+start.value+.1);sync()});
+document.getElementById('reset').onclick=()=>{file.value='';video.pause();video.removeAttribute('src');video.load();video.hidden=true;controls.hidden=true;status.textContent='Choose a video to start.'};
+document.getElementById('export').onclick=async()=>{if(!video.duration)return;const a=+start.value,b=+end.value;if(b<=a){status.textContent='Choose a valid start and end.';return}if(!window.MediaRecorder){status.textContent='Your browser does not support clip export.';return}
+const stream=video.captureStream?video.captureStream():video.mozCaptureStream?.();if(!stream){status.textContent='Video export is not supported for this format in this browser.';return}
+let mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));if(!mime){status.textContent='This browser cannot export WebM video.';return}
+const recorder=new MediaRecorder(stream,{mimeType:mime}), chunks=[];recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};recorder.onstop=()=>{const blob=new Blob(chunks,{type:mime}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='rm-cliper-short.webm';link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);status.textContent='Your clip is ready. Check your Downloads folder.';document.getElementById('export').disabled=false};
+document.getElementById('export').disabled=true;status.textContent='Exporting your clip… keep this tab open.';video.pause();video.currentTime=a;await new Promise(resolve=>video.onseeked=resolve);const tick=()=>{if(video.currentTime>=b){video.pause();recorder.stop();video.removeEventListener('timeupdate',tick)}};video.addEventListener('timeupdate',tick);recorder.start();await video.play();};
+sync();
+</script>
+</body></html>
