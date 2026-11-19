@@ -18,7 +18,13 @@ main{max-width:1120px;margin:54px auto;padding:0 22px}.hero{text-align:center;ma
 <main>
 <section class="hero"><div class="eyebrow">MAKE EVERY SECOND COUNT</div><h1>Long video in.<br><em>Great clips out.</em></h1><p>Paste a direct video link, select the moment you want, and export a short clip. Your video stays in your browser.</p></section>
 <div class="layout">
-<section class="panel"><h2>① Paste your video link</h2>
+<section class="panel"><h2>① Choose your video source</h2>
+<div class="field"><label for="youtubeUrl">YouTube link — preview only</label><input id="youtubeUrl" type="url" placeholder="https://www.youtube.com/watch?v=..." style="display:block;width:100%;padding:14px;border-radius:10px;border:1px solid var(--line);background:#080d0b;color:#f4fff6"></div>
+<div class="row"><button class="btn secondary" id="loadYoutube">Preview YouTube</button></div>
+<div id="youtubePreview" hidden style="margin-top:14px;position:relative;padding-bottom:56.25%;height:0"><iframe id="youtubeFrame" title="YouTube video preview" style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:12px" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>
+<p class="muted">YouTube videos can be previewed here. To trim and export, use a video file you own or have permission to edit.</p>
+<div class="field"><label for="videoFile">Upload a video file to trim</label><input id="videoFile" type="file" accept="video/*" style="display:block;width:100%;color:var(--muted)"></div>
+<div class="muted">Or paste a direct MP4/WebM file link:</div>
 <div class="field"><label for="videoUrl">Direct video URL</label><input id="videoUrl" type="url" placeholder="https://example.com/video.mp4" style="display:block;width:100%;padding:14px;border-radius:10px;border:1px solid var(--line);background:#080d0b;color:#f4fff6" autocomplete="url"></div>
 <div class="row"><button class="btn" id="loadUrl">Load video</button></div>
 <p class="muted">Use a direct MP4 or WebM file link. YouTube, Instagram and TikTok page links are not direct video files.</p>
@@ -37,14 +43,17 @@ main{max-width:1120px;margin:54px auto;padding:0 22px}.hero{text-align:center;ma
 <div class="foot">© 2026 RM CLIPER • Built for creators • No advertisements</div>
 </main>
 <script>
-const videoUrl=document.getElementById('videoUrl'), loadUrl=document.getElementById('loadUrl'), video=document.getElementById('video'), controls=document.getElementById('controls'), start=document.getElementById('start'), end=document.getElementById('end'), status=document.getElementById('status');
+const youtubeUrl=document.getElementById('youtubeUrl'), loadYoutube=document.getElementById('loadYoutube'), youtubePreview=document.getElementById('youtubePreview'), youtubeFrame=document.getElementById('youtubeFrame'), videoFile=document.getElementById('videoFile');\nconst videoUrl=document.getElementById('videoUrl'), loadUrl=document.getElementById('loadUrl'), video=document.getElementById('video'), controls=document.getElementById('controls'), start=document.getElementById('start'), end=document.getElementById('end'), status=document.getElementById('status');
 let objectUrl=null;
+function youtubeId(value){try{const u=new URL(value);if(u.hostname==='youtu.be')return u.pathname.slice(1).split('/')[0];if(u.hostname.endsWith('youtube.com')){if(u.pathname==='/watch')return u.searchParams.get('v');if(u.pathname.startsWith('/shorts/')||u.pathname.startsWith('/embed/'))return u.pathname.split('/')[2]} }catch(e){}return null}
+loadYoutube.addEventListener('click',()=>{const id=youtubeId(youtubeUrl.value.trim());if(!id||!/^[A-Za-z0-9_-]{11}$/.test(id)){status.textContent='Enter a valid YouTube video link.';return}youtubeFrame.src='https://www.youtube-nocookie.com/embed/'+id;youtubePreview.hidden=false;status.textContent='YouTube preview loaded. Upload an authorized video file below to trim and export.'});
+videoFile.addEventListener('change',()=>{const file=videoFile.files&&videoFile.files[0];if(!file)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(file);video.pause();video.src=objectUrl;video.hidden=false;controls.hidden=true;status.textContent='Loading uploaded video…';video.onerror=()=>{status.textContent='Could not open this video file.'};video.onloadedmetadata=()=>{start.max=video.duration;end.max=video.duration;start.value=0;end.value=video.duration;sync();controls.hidden=false;status.textContent='Video ready. Choose your clip.'};});
 function fmt(n){return Number(n).toFixed(1)+'s'}
 function sync(){document.getElementById('startVal').textContent=fmt(start.value);document.getElementById('endVal').textContent=fmt(end.value)}
 loadUrl.addEventListener('click',()=>{const url=videoUrl.value.trim();if(!url){status.textContent='Paste a direct MP4 or WebM video link first.';return}try{const parsed=new URL(url);if(!['http:','https:'].includes(parsed.protocol))throw new Error('bad url');}catch(e){status.textContent='Please enter a valid http or https video link.';return}if(objectUrl){URL.revokeObjectURL(objectUrl);objectUrl=null}video.pause();video.src=url;video.hidden=false;controls.hidden=true;status.textContent='Loading video…';video.onerror=()=>{status.textContent='Could not load this link. Use a direct MP4/WebM URL that allows browser playback.'};video.onloadedmetadata=()=>{start.max=video.duration;end.max=video.duration;start.value=0;end.value=video.duration;sync();controls.hidden=false;status.textContent='Video link loaded. Choose your clip.'};});
 start.addEventListener('input',()=>{if(+start.value>=+end.value)start.value=Math.max(0,+end.value-.1);sync()});
 end.addEventListener('input',()=>{if(+end.value<=+start.value)end.value=Math.min(video.duration,+start.value+.1);sync()});
-document.getElementById('reset').onclick=()=>{videoUrl.value='';video.pause();video.removeAttribute('src');video.load();video.hidden=true;controls.hidden=true;status.textContent='Paste a video link to start.'};
+document.getElementById('reset').onclick=()=>{videoUrl.value='';videoFile.value='';video.pause();video.removeAttribute('src');video.load();video.hidden=true;controls.hidden=true;status.textContent='Paste a video link to start.'};
 document.getElementById('export').onclick=async()=>{if(!video.duration)return;const a=+start.value,b=+end.value;if(b<=a){status.textContent='Choose a valid start and end.';return}if(!window.MediaRecorder){status.textContent='Your browser does not support clip export.';return}
 const stream=video.captureStream?video.captureStream():video.mozCaptureStream?.();if(!stream){status.textContent='Video export is not supported for this format in this browser.';return}
 let mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));if(!mime){status.textContent='This browser cannot export WebM video.';return}
